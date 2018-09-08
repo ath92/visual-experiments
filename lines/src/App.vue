@@ -13,7 +13,7 @@
 </template>
 
 <script>
-import debounce from 'lodash/debounce';
+import throttle from 'lodash/throttle';
 
 import WigglyLine from './wiggly-line';
 
@@ -58,10 +58,10 @@ export default {
       }
       this.lines = lines;
     },
-    handleMouseMove: debounce(function(e) {
+    handleMouseMove: throttle(function(e) {
       this.mouseX = e.clientX;
       this.mouseY = e.clientY;
-    }, 8, { maxWait: 8 }) 
+    }, 8) 
   }
 }
 </script>
