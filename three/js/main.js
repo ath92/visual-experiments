@@ -3,14 +3,27 @@ const eyesDistanceMm = 64;
 const cameraFovRadians = 1.117; // estimate based on some measurement
 const aspectRatio = 9/16;
 
-
-let near = 0.7; 
-const far = 1000;
-
 let renderer;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, near, far );
-const cubes = [];
+const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.7, 1000 );
+const tadpole = new Tadpole(7);
+
+// initial
+const tadPolePosition = new THREE.Vector3(0, -5, -10);
+
+const direction = new THREE.Vector3(0, 0, 0.2);
+
+function createGround() {
+	const geometry = new THREE.PlaneBufferGeometry(200, 200, 200, 200);
+	const material = new THREE.MeshBasicMaterial( {
+	    color: 0xffffff,
+	    wireframe: true,
+	} );
+	const plane = new THREE.Mesh(geometry, material);
+	plane.position.set(0, -10, -10);
+	plane.rotation.set(-0.5*Math.PI, 0, 0);
+	scene.add( plane );
+}
 
 function initScene() {
 	renderer = new THREE.WebGLRenderer();
@@ -18,47 +31,16 @@ function initScene() {
 	document.body.appendChild( renderer.domElement );
 
 	const directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
-	directionalLight.position.set(0,1,1);
+	directionalLight.position.set(0,6,6);
 	scene.add( directionalLight );
 
-	const directionalLight2 = new THREE.DirectionalLight( 0xffffff, 1 );
-	directionalLight2.position.set(-1,-1,1);
-	scene.add( directionalLight2 );
-
-	const directionalLight3 = new THREE.DirectionalLight( 0xffffff, 1 );
-	directionalLight3.position.set(1,1,1);
-	scene.add( directionalLight3 );
-
-	const geometry = new THREE.BoxGeometry( 1, 1, 1000 );
-	const positions = [	new THREE.Vector3(1,1,0),
-						new THREE.Vector3(2,-3,0),
-						new THREE.Vector3(3,-1,0),
-						new THREE.Vector3(-2,3,0),
-						new THREE.Vector3(-3,1,0),
-					];
-
-	// create and add cube for each position we need
-	for(let i = 0; i < positions.length; i++){
-		const material = new THREE.MeshLambertMaterial( { color: [0x00ff00, 0xff0000, 0x0000ff][i%3] } );
-		const cube = new THREE.Mesh( geometry, material );
-		Object.assign(cube.position, positions[i]);
-		scene.add(cube);
-		cubes.push(cube);
-	}
-
-	camera.position.z = 0;
+	tadpole.addToScene(scene);
+	tadpole.setPosition(tadPolePosition);
+	createGround();
 }
 
-
-const now = new Date();
 let rollingAverages = Array(15).fill({x: 0, y: 0, z: 1});
 function animate(){
-	const t = new Date() - now;
-
-	let newNear = near;
-
-	// cubes[0].rotation.z += 0.01;
-
 	let distanceToCamera = unitDistanceToCamera();
 	let distancesToCenter = unitDistancesToCenter();
 
@@ -70,14 +52,16 @@ function animate(){
 						}, 
 						...rollingAverages ];
 
-	camera.position.x = rollingAverages.reduce
+	const facePosition = rollingAverages.reduce
 	((average, current) => average + current.x / rollingAverages.length, 0);
 
-	camera.position.y = -rollingAverages.reduce
-	((average, current) => average + current.y / rollingAverages.length, 0) * aspectRatio;
-
-	camera.position.z = rollingAverages.reduce
-	((average, current) => average + current.z / rollingAverages.length, 0);
+	if (!isNaN(facePosition)) {
+		const currentPosition = tadpole.getHeadPosition();
+		direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.02 * facePosition * 0.5 * Math.PI);
+		tadpole.setPosition(currentPosition.add(direction), facePosition, direction);
+		Object.assign(camera.position, tadpole.getHeadPosition().add(direction.clone().normalize().negate().multiplyScalar(10.0)).add(new THREE.Vector3(0, 5, 0)));
+	}
+	camera.lookAt(tadpole.getHeadPosition());
 
 	requestAnimationFrame(animate);
 	renderer.render(scene, camera);
