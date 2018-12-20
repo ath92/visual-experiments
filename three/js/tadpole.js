@@ -1,32 +1,36 @@
-function Tadpole(numberOfSpheres = 5){
+function Tadpole(numberOfSpheres = 5, size = 1, positionsGap = 5){
+	this.positionsGap = positionsGap;
 	this.spheres = [];
+	this.positions = [];
+	this.numberOfSpheres = numberOfSpheres;
 
 	for (let i = 0; i < numberOfSpheres; i++) {
-		const geometry = new THREE.SphereGeometry((numberOfSpheres - i) / 5, 16, 16);
-		const material = new THREE.MeshLambertMaterial({ color: 0xffff00 });
+		const geometry = new THREE.SphereGeometry((numberOfSpheres - i) / numberOfSpheres * size, 16, 16);
+		const material = new THREE.MeshLambertMaterial({ color: Math.floor(Math.random()*0xffff00) });
 		const sphere = new THREE.Mesh(geometry, material);
 
 		this.spheres.push(sphere);
 	}
 }
 
-/**
-* @param position: THREE.Vector3
-**/
-Tadpole.prototype.setPosition = function(position, swing = 0, direction = new THREE.Vector3(0, 0, 0.2)) {
-	this.spheres.forEach((sphere, index) => {
-		const tailDistance = direction.clone().normalize().multiplyScalar(-1 * (index - (index ** .07)));
-		const orthogonal = direction.clone().normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.5 * Math.PI);
-		const tailSwingOffset = orthogonal.multiplyScalar(0.2 * (index ** 2) * swing);
-		Object.assign(sphere.position, (position.clone().add(tailDistance).add(tailSwingOffset)));
-	});
+Tadpole.prototype.setPosition = function(position) {
+	if (this.positions.length < this.numberOfSpheres * this.positionsGap) {
+		this.positions.push(position);
+	} else {
+		this.positions = [position, ...this.positions.slice(0, this.positions.length - 2)];
+	}
+
+	for (let i = 0; i < this.positions.length; i += this.positionsGap) {
+		Object.assign(this.spheres[Math.floor(i / this.positionsGap)].position, this.positions[i]);
+	}
 }
 
-/**
-* @param scene: THREE.Scene
-**/
 Tadpole.prototype.addToScene = function(scene) {
 	this.spheres.forEach(sphere => scene.add(sphere));
+}
+
+Tadpole.prototype.removeFromScene = function(scene) {
+	this.spheres.forEach(sphere => scene.remove(sphere));
 }
 
 Tadpole.prototype.getHeadPosition = function() {

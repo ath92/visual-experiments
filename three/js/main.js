@@ -39,26 +39,26 @@ function initScene() {
 	createGround();
 }
 
-let rollingAverages = Array(15).fill({x: 0, y: 0, z: 1});
+let facePositions = Array(15).fill({x: 0, y: 0, z: 1});
 function animate(){
 	let distanceToCamera = unitDistanceToCamera();
 	let distancesToCenter = unitDistancesToCenter();
 
-	rollingAverages.splice(-1);
-	rollingAverages = [	{
-							x: distancesToCenter.x, 
-							y: distancesToCenter.y, 
-							z: distanceToCamera
-						}, 
-						...rollingAverages ];
+	facePositions.splice(-1);
+	facePositions = [{
+					x: distancesToCenter.x, 
+					y: distancesToCenter.y, 
+					z: distanceToCamera
+				}, 
+				...facePositions];
 
-	const facePosition = rollingAverages.reduce
-	((average, current) => average + current.x / rollingAverages.length, 0);
+	const facePosition = facePositions.reduce
+	((average, current) => average + current.x / facePositions.length, 0);
 
 	if (!isNaN(facePosition)) {
 		const currentPosition = tadpole.getHeadPosition();
 		direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.02 * facePosition * 0.5 * Math.PI);
-		tadpole.setPosition(currentPosition.add(direction), facePosition, direction);
+		tadpole.setPosition(currentPosition.add(direction));
 		Object.assign(camera.position, tadpole.getHeadPosition().add(direction.clone().normalize().negate().multiplyScalar(10.0)).add(new THREE.Vector3(0, 5, 0)));
 	}
 	camera.lookAt(tadpole.getHeadPosition());
@@ -69,3 +69,48 @@ function animate(){
 
 initScene();
 animate();
+
+// MULTIPLAYER
+
+let enemies = [];
+const key = Math.floor(Math.random () * 999999999999);
+var socket = io('http://localhost:3000');
+socket.on('connect', function() {
+    const sendPosition = () => {
+    	if (scene) {
+	        socket.emit('position', {
+	        	key,
+	        	position: tadpole.getHeadPosition(),
+	        }, ({ items }) => {
+	        	// loop through data.items
+	        	// for each item, set the position of a tadpole
+	        	items.forEach(item => {
+	        		const enemy = enemies.find(({ key }) => key === item.key);
+	        		if (enemy) {
+	        			enemy.tadPole.setPosition(item.position);
+	        		} else {
+	        			// new player has entered the field
+	        			const taddie = new Tadpole(5, .8, 1);
+	        			taddie.addToScene(scene);
+	        			taddie.setPosition(item.position)
+	        			enemies.push({
+	        				key: item.key,
+	        				tadPole: taddie,
+	        			});
+	        		}
+	        	});
+	        	// remove enemies that weren't in the response
+	        	enemies
+	        		.findIndex(enemy => !items.some(({ key }) => key === enemy.key))
+	        		.forEach(enemy => {
+	        			enemy.removeFromScene(scene);
+	        		});
+	        });
+    	}
+        setTimeout(sendPosition, 100);
+    }
+    sendPosition();
+});
+socket.on('event', function(data){});
+socket.on('disconnect', function(){});
+
