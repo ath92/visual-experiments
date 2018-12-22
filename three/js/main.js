@@ -73,15 +73,11 @@ animate();
 // MULTIPLAYER
 
 let enemies = [];
-const key = Math.floor(Math.random () * 999999999999);
-var socket = io('http://localhost:3000');
+var socket = io('https://head-controller.herokuapp.com');
 socket.on('connect', function() {
     const sendPosition = () => {
     	if (scene) {
-	        socket.emit('position', {
-	        	key,
-	        	position: tadpole.getHeadPosition(),
-	        }, ({ items }) => {
+	        socket.emit('position', tadpole.getHeadPosition(), ({ items }) => {
 	        	// loop through data.items
 	        	// for each item, set the position of a tadpole
 	        	items.forEach(item => {
@@ -101,9 +97,9 @@ socket.on('connect', function() {
 	        	});
 	        	// remove enemies that weren't in the response
 	        	enemies
-	        		.findIndex(enemy => !items.some(({ key }) => key === enemy.key))
+	        		.filter(enemy => !items.some(({ key }) => key === enemy.key))
 	        		.forEach(enemy => {
-	        			enemy.removeFromScene(scene);
+	        			enemy.tadPole.removeFromScene(scene);
 	        		});
 	        });
     	}
@@ -111,6 +107,3 @@ socket.on('connect', function() {
     }
     sendPosition();
 });
-socket.on('event', function(data){});
-socket.on('disconnect', function(){});
-

@@ -1,0 +1,188 @@
+<!doctype html>
+<html>
+	<head>
+		<title>voxel rayz</title>
+		<style type="text/css">
+			p { 
+				font-size: 3px;
+				margin: 0;
+				white-space: pre-wrap;
+				font-family: monospace;
+	 		}
+		</style>
+	</head>
+	<body>
+		<div id="test"></div>
+		<script type="text/javascript">
+			const empty = 0x000000;
+			const width = 320;
+			const height = 240;
+			const aspecRatio = height / width;
+
+			function Vector3D(x, y, z) {
+				this.x = x;
+				this.y = y;
+				this.z = z;
+			}
+
+			// Some vector util functions
+
+			function add(a, b) {
+				return {
+					x: a.x + b.x,
+					y: a.y + b.y,
+					z: a.z + b.z,
+				}
+			}
+
+			function scale(vector, scalar) {
+				return {
+					x: vector.x * scalar,
+					y: vector.y * scalar,
+					z: vector.z * scalar,
+				}
+			}
+
+			function normalize(v) {
+				const length = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+				return scale(v, 1 / length);
+			}
+
+			function dot(a, b) {
+				return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
+			}
+
+			function cross(a, b) {
+				return {
+					x: a.y * b.z - a.z * b.y,
+					y: a.z * b.x - a.x * b.z,
+					z: a.x * b.y - a.y * b.x,
+				}
+			}
+
+			function toRadians(degrees) {
+				return degrees * (2 * Math.PI / 360);;
+			}
+
+			// angle in radians
+			function axisRotation(vector, axis, angle) {
+				return add(add(scale(vector, Math.cos(angle)), scale(cross(axis, vector), Math.sin(angle))), scale(axis, dot(axis, vector) * (1 - Math.cos(angle))));
+				// https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+			}
+
+			// Now for the actual game
+
+			function World(axisLength) {
+				this.axisLength = axisLength;
+				this.voxels = [];
+				for (let x = 0; x < axisLength; x++) {
+					this.voxels[x] = [];
+					for (let y = 0; y < axisLength; y++) {
+						this.voxels[x][y] = [];
+						for (let z = 0; z < axisLength; z++) {
+							this.voxels[x][y][z] = Math.max(empty, Math.round((Math.random() * 0xFFFFFF) - (0xEEEEEE)));
+						}
+					}
+				}
+			}
+
+			World.prototype.intersects = function(ray) {
+				const x = Math.floor(ray.position.x);
+				const y = Math.floor(ray.position.y);
+				const z = Math.floor(ray.position.z);
+				if (x < 0 || x >= this.axisLength 
+					|| y < 0 || y >= this.axisLength 
+					|| z < 0 || z >= this.axisLength) {
+					return false;
+				}
+				return (this.voxels[x][y][z] !== empty);
+			}
+
+			function Ray(position, direction) {
+				this.position = position;
+				this.direction = direction;
+			}
+
+			Ray.prototype.move = function(speed) {
+				this.position = add(this.position, scale(this.direction, speed));
+			}
+
+
+			// both Vector3D
+			function Camera(position, direction, fov) {
+				this.position = position;
+				this.direction = normalize(direction);
+				this.fov = toRadians(fov);
+			}
+
+			Camera.prototype.createRays = function() {
+				// shoot rays from position in the right direction
+				// position should stay the same, but direction should be slightly rotated
+				// rotate along y axis by fov 
+				
+				const horizontalRotationAxis = new Vector3D(0, 1, 0);
+				const verticalRotationAxis = normalize(axisRotation(this.direction, horizontalRotationAxis, toRadians(90)));
+
+				const rays = [];
+
+				for (let y = 0; y < height; y++) {
+					const verticalRotation = (y / height - 0.5) * this.fov * aspecRatio;
+					rays[y] = [];
+					for (let x = 0; x < width; x++) {
+						const horizontalRotation = (x / width - 0.5) * this.fov;
+						const xRotated = axisRotation(this.direction, horizontalRotationAxis, horizontalRotation);
+						const xyRotated = axisRotation(xRotated, verticalRotationAxis, verticalRotation);
+
+						rays[y][x] = new Ray(this.position, xyRotated);
+					}
+				}
+
+				return rays;
+			}
+
+			const worldSize = 96;
+			const near = 0.5;
+			const far = 200;
+			const step = 0.05;
+
+			const world = new World(worldSize);
+
+			const camera = new Camera(new Vector3D(-worldSize, 0.5 * worldSize, -worldSize), new Vector3D(1, 0, 1), 70);
+
+			function render(world, camera) {
+				const rays = camera.createRays();
+				const hits = [];
+				return rays.map((row, index) => row.map(ray => {
+						let t = near;
+						ray.move(near);
+						while (t < far) {
+							t += step;
+							ray.move(step);
+							if (world.intersects(ray)) {
+								return true;
+							}
+						}
+						return false;
+					})
+				);
+			}
+
+			function testPrint() {
+				const strings = render(world, camera).map(row => row.map(cell => cell ? 'x' : ' '));
+				console.log(strings.length);
+				strings.forEach(arr => {
+					const p = document.createElement("p");
+					const text = document.createTextNode(arr.join(''));
+					p.appendChild(text);
+					document.body.append(p);
+				});
+			}
+
+			testPrint();
+
+
+			// TODO: 
+
+		</script>
+	</body>
+</html>
