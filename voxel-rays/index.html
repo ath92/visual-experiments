@@ -12,6 +12,7 @@
 		</style>
 	</head>
 	<body>
+		<canvas id="canvas" width="320" height="240"></canvas>
 		<div id="test"></div>
 		<script type="text/javascript">
 			const empty = 0x000000;
@@ -72,30 +73,30 @@
 
 			// Now for the actual game
 
-			function World(axisLength) {
-				this.axisLength = axisLength;
+			function World(size) {
+				this.size = size;
 				this.voxels = [];
-				for (let x = 0; x < axisLength; x++) {
+				for (let x = 0; x < size; x++) {
 					this.voxels[x] = [];
-					for (let y = 0; y < axisLength; y++) {
+					for (let y = 0; y < size; y++) {
 						this.voxels[x][y] = [];
-						for (let z = 0; z < axisLength; z++) {
+						for (let z = 0; z < size; z++) {
 							this.voxels[x][y][z] = Math.max(empty, Math.round((Math.random() * 0xFFFFFF) - (0xEEEEEE)));
 						}
 					}
 				}
 			}
 
-			World.prototype.intersects = function(ray) {
-				const x = Math.floor(ray.position.x);
-				const y = Math.floor(ray.position.y);
-				const z = Math.floor(ray.position.z);
-				if (x < 0 || x >= this.axisLength 
-					|| y < 0 || y >= this.axisLength 
-					|| z < 0 || z >= this.axisLength) {
-					return false;
+			World.prototype.at = function(position) {
+				const x = Math.floor(position.x);
+				const y = Math.floor(position.y);
+				const z = Math.floor(position.z);
+				if (x < 0 || x >= this.size 
+					|| y < 0 || y >= this.size 
+					|| z < 0 || z >= this.size) {
+					return empty;
 				}
-				return (this.voxels[x][y][z] !== empty);
+				return this.voxels[x][y][z];
 			}
 
 			function Ray(position, direction) {
@@ -147,8 +148,10 @@
 
 			const world = new World(worldSize);
 
-			const camera = new Camera(new Vector3D(-worldSize, 0.5 * worldSize, -worldSize), new Vector3D(1, 0, 1), 70);
-
+			const camera = new Camera(new Vector3D(-worldSize, 0.5 * worldSize, -worldSize),	// position
+									  new Vector3D(1, 0, 1),									// direction 
+									  70);														// fov
+				
 			function render(world, camera) {
 				const rays = camera.createRays();
 				const hits = [];
@@ -158,14 +161,37 @@
 						while (t < far) {
 							t += step;
 							ray.move(step);
-							if (world.intersects(ray)) {
-								return true;
+							const space = world.at(ray.position);
+							if (space !== empty) {
+								return space;
 							}
 						}
-						return false;
+						return empty;
 					})
 				);
 			}
+
+			function renderToCanvas(){
+				const canvas = document.getElementById('canvas');
+				const ctx = canvas.getContext('2d');
+
+				render(world, camera).forEach((line, y) => line.forEach((pixel, x) => {
+					const hexString = decimalToHex(pixel);
+					console.log(hexString);
+					ctx.fillStyle = `#${hexString}`;
+					ctx.fillRect(x, y, 1, 1);
+				}));
+			}
+
+			function decimalToHex(d) {
+				var hex = Number(d).toString(16);
+				hex = "000000".substr(0, 6 - hex.length) + hex; 
+				return hex;
+			}
+
+			renderToCanvas();
+
+
 
 			function testPrint() {
 				const strings = render(world, camera).map(row => row.map(cell => cell ? 'x' : ' '));
@@ -177,8 +203,6 @@
 					document.body.append(p);
 				});
 			}
-
-			testPrint();
 
 
 			// TODO: 
